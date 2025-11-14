@@ -1,0 +1,6 @@
+export enum BrokerStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  INVITED = 'INVITED',
+  PENDING_DOCUMENTS = 'PENDING_DOCUMENTS',
+}
