@@ -20,6 +20,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { PartnerLinksService } from '../partner-links/partner-links.service';
 import { PartnerLink } from '../partner-links/entities/partner-link.entity';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 export interface TokenPayload {
   sub: string;
@@ -352,6 +353,24 @@ export class AuthService {
     await this.usersService.updatePassword(user.id, passwordHash);
 
     return { success: true };
+  }
+
+  async changePassword(
+    userId: string,
+    dto: UpdatePasswordDto,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Usuário não encontrado.');
+    }
+
+    const isValid = await compare(dto.currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new BadRequestException('Senha atual inválida.');
+    }
+
+    const newHash = await hash(dto.newPassword, 10);
+    await this.usersService.updatePassword(user.id, newHash);
   }
 
   private async resolveInvite(token: string, role: UserRole) {

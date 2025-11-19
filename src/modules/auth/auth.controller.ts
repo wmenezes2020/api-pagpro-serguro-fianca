@@ -9,6 +9,7 @@ import { RegisterFranqueadoDto } from './dto/register-franqueado.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
@@ -84,5 +85,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Redefinir senha com token' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Post('change-password')
+  @ApiOperation({ summary: 'Alterar senha do usuário autenticado' })
+  async changePassword(
+    @CurrentUser() user: User,
+    @Body() dto: UpdatePasswordDto,
+  ) {
+    await this.authService.changePassword(user.id, dto);
+    return { success: true };
   }
 }
