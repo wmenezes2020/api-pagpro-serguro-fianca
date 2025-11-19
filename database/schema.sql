@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `cliente_psf_users` (
   `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID do usuário',
   `email` VARCHAR(255) NOT NULL UNIQUE COMMENT 'Email único do usuário',
   `passwordHash` VARCHAR(255) NOT NULL COMMENT 'Hash da senha (bcrypt)',
-  `role` ENUM('ADMIN', 'IMOBILIARIA', 'INQUILINO', 'CORRETOR') NOT NULL COMMENT 'Papel do usuário no sistema',
+  `role` ENUM('ADMIN', 'DIRECTOR', 'FRANQUEADO', 'IMOBILIARIA', 'INQUILINO', 'CORRETOR') NOT NULL COMMENT 'Papel do usuário no sistema',
   `isActive` BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Usuário ativo/inativo',
   `fullName` VARCHAR(255) NULL COMMENT 'Nome completo',
   `phone` VARCHAR(20) NULL COMMENT 'Telefone de contato',
@@ -37,11 +37,13 @@ CREATE TABLE IF NOT EXISTS `cliente_psf_users` (
   `passwordResetToken` VARCHAR(255) NULL COMMENT 'Token para recuperação de senha',
   `passwordResetTokenExpiresAt` TIMESTAMP NULL COMMENT 'Data de expiração do token de reset',
   `lastLoginAt` TIMESTAMP NULL COMMENT 'Último login do usuário',
+  `parent_user_id` CHAR(36) NULL COMMENT 'FK para cliente_psf_users.id (responsável hierárquico)',
   `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
   `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização',
   INDEX `idx_cliente_psf_users_email` (`email`),
   INDEX `idx_cliente_psf_users_role` (`role`),
-  INDEX `idx_cliente_psf_users_isActive` (`isActive`)
+  INDEX `idx_cliente_psf_users_isActive` (`isActive`),
+  INDEX `idx_cliente_psf_users_parent` (`parent_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tabela de usuários do sistema';
 
 -- =====================================================
@@ -96,6 +98,45 @@ CREATE TABLE IF NOT EXISTS `cliente_psf_corretor_profiles` (
   `brokerageName` VARCHAR(255) NULL COMMENT 'Nome da imobiliária onde trabalha',
   INDEX `idx_corretor_cpf` (`cpf`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Perfis de corretores';
+
+-- =====================================================
+-- TABELA: franqueado_profiles
+-- =====================================================
+-- Perfil específico de franqueados/associados
+DROP TABLE IF EXISTS `franqueado_profiles`;
+CREATE TABLE IF NOT EXISTS `franqueado_profiles` (
+  `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID do perfil do franqueado',
+  `user_id` CHAR(36) NOT NULL UNIQUE COMMENT 'FK para cliente_psf_users.id',
+  `companyName` VARCHAR(255) NOT NULL COMMENT 'Nome/razão social do franqueado',
+  `document` VARCHAR(30) NULL COMMENT 'Documento (CPF/CNPJ)',
+  `region` VARCHAR(120) NULL COMMENT 'Região/cobertura',
+  `notes` TEXT NULL COMMENT 'Observações adicionais',
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização',
+  INDEX `idx_franqueado_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Perfis de franqueados PagPro';
+
+-- =====================================================
+-- TABELA: partner_links
+-- =====================================================
+-- Convites tokenizados para cadastros hierárquicos
+DROP TABLE IF EXISTS `partner_links`;
+CREATE TABLE IF NOT EXISTS `partner_links` (
+  `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID do convite',
+  `token` VARCHAR(64) NOT NULL UNIQUE COMMENT 'Token seguro do convite',
+  `created_by_id` CHAR(36) NOT NULL COMMENT 'FK para cliente_psf_users.id (emissor)',
+  `targetRole` ENUM('ADMIN', 'DIRECTOR', 'FRANQUEADO', 'IMOBILIARIA', 'INQUILINO', 'CORRETOR') NOT NULL COMMENT 'Papel alvo do convite',
+  `isActive` BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Convite ativo/inativo',
+  `maxUses` INT NOT NULL DEFAULT 1 COMMENT 'Quantidade máxima de usos',
+  `usedCount` INT NOT NULL DEFAULT 0 COMMENT 'Quantidade utilizada',
+  `expiresAt` TIMESTAMP NULL COMMENT 'Data de expiração',
+  `notes` TEXT NULL COMMENT 'Observações',
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização',
+  INDEX `idx_partner_links_creator` (`created_by_id`),
+  INDEX `idx_partner_links_target` (`targetRole`),
+  INDEX `idx_partner_links_active` (`isActive`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Convites tokenizados';
 
 -- =====================================================
 -- TABELA: cliente_psf_properties
@@ -281,6 +322,79 @@ CREATE TABLE IF NOT EXISTS `cliente_psf_imobiliaria_brokers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Corretores vinculados às imobiliárias';
 
 -- =====================================================
+-- TABELA: cliente_psf_commission_rates
+-- =====================================================
+-- Configuração de taxas de comissão por papel e tipo
+DROP TABLE IF EXISTS `cliente_psf_commission_rates`;
+CREATE TABLE IF NOT EXISTS `cliente_psf_commission_rates` (
+  `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID da taxa',
+  `role` ENUM('ADMIN', 'DIRECTOR', 'FRANQUEADO', 'IMOBILIARIA', 'INQUILINO', 'CORRETOR') NOT NULL COMMENT 'Papel beneficiado',
+  `commissionType` VARCHAR(50) NOT NULL COMMENT 'Tipo da comissão (SETUP_FEE, MONTHLY_FEE, REFERRAL, etc.)',
+  `percentage` DECIMAL(5,2) NOT NULL COMMENT 'Percentual da comissão',
+  `isActive` BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Taxa ativa/inativa',
+  `description` TEXT NULL COMMENT 'Descrição da regra',
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização',
+  INDEX `idx_commission_rates_role_type` (`role`, `commissionType`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Taxas de comissão configuráveis';
+
+-- =====================================================
+-- TABELA: cliente_psf_commissions
+-- =====================================================
+-- Registro de comissões geradas
+DROP TABLE IF EXISTS `cliente_psf_commissions`;
+CREATE TABLE IF NOT EXISTS `cliente_psf_commissions` (
+  `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID da comissão',
+  `beneficiaryId` CHAR(36) NOT NULL COMMENT 'FK para cliente_psf_users.id (quem recebe)',
+  `applicationId` CHAR(36) NULL COMMENT 'FK para cliente_psf_rental_applications.id',
+  `referralId` CHAR(36) NULL COMMENT 'FK para cliente_psf_referrals.id',
+  `commissionType` VARCHAR(50) NOT NULL COMMENT 'Tipo da comissão',
+  `amount` DECIMAL(10,2) NOT NULL COMMENT 'Valor da comissão',
+  `percentage` DECIMAL(5,2) NOT NULL COMMENT 'Percentual utilizado',
+  `status` ENUM('PENDING', 'APPROVED', 'PAID', 'CANCELLED') NOT NULL DEFAULT 'PENDING' COMMENT 'Status da comissão',
+  `paidAt` TIMESTAMP NULL COMMENT 'Data de pagamento',
+  `notes` TEXT NULL COMMENT 'Notas adicionais',
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização',
+  INDEX `idx_commissions_beneficiary` (`beneficiaryId`),
+  INDEX `idx_commissions_status` (`status`),
+  INDEX `idx_commissions_application` (`applicationId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Comissões geradas';
+
+-- =====================================================
+-- TABELA: cliente_psf_referrals
+-- =====================================================
+-- Registro de indicações/indicações remuneradas
+DROP TABLE IF EXISTS `cliente_psf_referrals`;
+CREATE TABLE IF NOT EXISTS `cliente_psf_referrals` (
+  `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID da indicação',
+  `referrerId` CHAR(36) NOT NULL COMMENT 'FK para cliente_psf_users.id (quem indicou)',
+  `referredId` CHAR(36) NOT NULL COMMENT 'FK para cliente_psf_users.id (indicado)',
+  `applicationId` CHAR(36) NULL COMMENT 'FK para cliente_psf_rental_applications.id',
+  `status` ENUM('PENDING', 'APPROVED', 'PAID', 'CANCELLED') NOT NULL DEFAULT 'PENDING' COMMENT 'Status da indicação',
+  `commissionAmount` DECIMAL(10,2) NULL COMMENT 'Valor pago pela indicação',
+  `notes` TEXT NULL COMMENT 'Notas',
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização',
+  INDEX `idx_referrals_referrer` (`referrerId`),
+  INDEX `idx_referrals_referred` (`referredId`),
+  INDEX `idx_referrals_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Indicações entre usuários';
+
+-- =====================================================
+-- TABELA: payout_rules
+-- =====================================================
+-- Regras padrão de repasse hierárquico
+DROP TABLE IF EXISTS `payout_rules`;
+CREATE TABLE IF NOT EXISTS `payout_rules` (
+  `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT 'UUID da regra',
+  `role` ENUM('ADMIN', 'DIRECTOR', 'FRANQUEADO', 'IMOBILIARIA', 'INQUILINO', 'CORRETOR') NOT NULL UNIQUE COMMENT 'Papel beneficiado',
+  `percentage` DECIMAL(5,2) NOT NULL COMMENT 'Percentual configurado',
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data de criação',
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Data de atualização'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Regras de payout hierárquico';
+
+-- =====================================================
 -- TABELA: cliente_psf_notifications
 -- =====================================================
 -- Notificações do sistema
@@ -344,6 +458,7 @@ CREATE TABLE IF NOT EXISTS `cliente_psf_documents` (
 
 -- Índices compostos para consultas frequentes
 CREATE INDEX `idx_users_role_active` ON `cliente_psf_users` (`role`, `isActive`);
+CREATE INDEX `idx_users_parent` ON `cliente_psf_users` (`parent_user_id`);
 CREATE INDEX `idx_applications_status_created` ON `cliente_psf_rental_applications` (`status`, `createdAt`);
 CREATE INDEX `idx_payments_status_due` ON `cliente_psf_payment_schedules` (`status`, `dueDate`);
 CREATE INDEX `idx_notifications_user_read` ON `cliente_psf_notifications` (`userId`, `read`);

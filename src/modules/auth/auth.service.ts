@@ -12,11 +12,14 @@ import { UsersService } from '../users/users.service';
 import { RegisterImobiliariaDto } from './dto/register-imobiliaria.dto';
 import { RegisterInquilinoDto } from './dto/register-inquilino.dto';
 import { RegisterCorretorDto } from './dto/register-corretor.dto';
+import { RegisterFranqueadoDto } from './dto/register-franqueado.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { PartnerLinksService } from '../partner-links/partner-links.service';
+import { PartnerLink } from '../partner-links/entities/partner-link.entity';
 
 export interface TokenPayload {
   sub: string;
@@ -40,6 +43,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly partnerLinksService: PartnerLinksService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<User> {
@@ -87,28 +91,44 @@ export class AuthService {
       throw new ConflictException('CNPJ já está cadastrado em outra conta.');
     }
 
-    const passwordHash = await hash(dto.password, 10);
-    const user = await this.usersService.createBaseUser({
-      email: dto.email,
-      passwordHash,
-      role: UserRole.IMOBILIARIA,
-      fullName: dto.fullName,
-      phone: dto.phone,
-    });
+    const invite = await this.resolveInvite(
+      dto.inviteToken,
+      UserRole.IMOBILIARIA,
+    );
+    const parent = await this.usersService.findById(invite.createdBy.id);
+    if (!parent) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw new BadRequestException('Convite inválido.');
+    }
 
-    await this.usersService.attachImobiliariaProfile(user, {
-      companyName: dto.companyName,
-      cnpj: dto.cnpj,
-      creci: dto.creci,
-      website: dto.website,
-      address: dto.address,
-      city: dto.city,
-      state: dto.state,
-      postalCode: dto.postalCode,
-    });
+    try {
+      const passwordHash = await hash(dto.password, 10);
+      const user = await this.usersService.createBaseUser({
+        email: dto.email,
+        passwordHash,
+        role: UserRole.IMOBILIARIA,
+        fullName: dto.fullName,
+        phone: dto.phone,
+        parent,
+      });
 
-    const hydratedUser = await this.loadUserOrFail(user.id);
-    return this.login(hydratedUser);
+      await this.usersService.attachImobiliariaProfile(user, {
+        companyName: dto.companyName,
+        cnpj: dto.cnpj,
+        creci: dto.creci,
+        website: dto.website,
+        address: dto.address,
+        city: dto.city,
+        state: dto.state,
+        postalCode: dto.postalCode,
+      });
+
+      const hydratedUser = await this.loadUserOrFail(user.id);
+      return this.login(hydratedUser);
+    } catch (error) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw error;
+    }
   }
 
   async registerInquilino(dto: RegisterInquilinoDto): Promise<AuthResponse> {
@@ -117,27 +137,43 @@ export class AuthService {
       throw new ConflictException('CPF já está cadastrado em outra conta.');
     }
 
-    const passwordHash = await hash(dto.password, 10);
-    const user = await this.usersService.createBaseUser({
-      email: dto.email,
-      passwordHash,
-      role: UserRole.INQUILINO,
-      fullName: dto.fullName,
-      phone: dto.phone,
-    });
+    const invite = await this.resolveInvite(
+      dto.inviteToken,
+      UserRole.INQUILINO,
+    );
+    const parent = await this.usersService.findById(invite.createdBy.id);
+    if (!parent) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw new BadRequestException('Convite inválido.');
+    }
 
-    await this.usersService.attachInquilinoProfile(user, {
-      fullName: dto.fullName,
-      cpf: dto.cpf,
-      birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
-      phone: dto.phone,
-      monthlyIncome: dto.monthlyIncome,
-      hasNegativeRecords: dto.hasNegativeRecords,
-      employmentStatus: dto.employmentStatus,
-    });
+    try {
+      const passwordHash = await hash(dto.password, 10);
+      const user = await this.usersService.createBaseUser({
+        email: dto.email,
+        passwordHash,
+        role: UserRole.INQUILINO,
+        fullName: dto.fullName,
+        phone: dto.phone,
+        parent,
+      });
 
-    const hydratedUser = await this.loadUserOrFail(user.id);
-    return this.login(hydratedUser);
+      await this.usersService.attachInquilinoProfile(user, {
+        fullName: dto.fullName,
+        cpf: dto.cpf,
+        birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
+        phone: dto.phone,
+        monthlyIncome: dto.monthlyIncome,
+        hasNegativeRecords: dto.hasNegativeRecords,
+        employmentStatus: dto.employmentStatus,
+      });
+
+      const hydratedUser = await this.loadUserOrFail(user.id);
+      return this.login(hydratedUser);
+    } catch (error) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw error;
+    }
   }
 
   async registerCorretor(dto: RegisterCorretorDto): Promise<AuthResponse> {
@@ -146,25 +182,79 @@ export class AuthService {
       throw new ConflictException('CPF já está cadastrado em outra conta.');
     }
 
-    const passwordHash = await hash(dto.password, 10);
-    const user = await this.usersService.createBaseUser({
-      email: dto.email,
-      passwordHash,
-      role: UserRole.CORRETOR,
-      fullName: dto.fullName,
-      phone: dto.phone,
-    });
+    const invite = await this.resolveInvite(dto.inviteToken, UserRole.CORRETOR);
+    const parent = await this.usersService.findById(invite.createdBy.id);
+    if (!parent) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw new BadRequestException('Convite inválido.');
+    }
 
-    await this.usersService.attachCorretorProfile(user, {
-      fullName: dto.fullName,
-      cpf: dto.cpf,
-      creci: dto.creci,
-      phone: dto.phone,
-      brokerageName: dto.brokerageName,
-    });
+    try {
+      const passwordHash = await hash(dto.password, 10);
+      const user = await this.usersService.createBaseUser({
+        email: dto.email,
+        passwordHash,
+        role: UserRole.CORRETOR,
+        fullName: dto.fullName,
+        phone: dto.phone,
+        parent,
+      });
 
-    const hydratedUser = await this.loadUserOrFail(user.id);
-    return this.login(hydratedUser);
+      await this.usersService.attachCorretorProfile(user, {
+        fullName: dto.fullName,
+        cpf: dto.cpf,
+        creci: dto.creci,
+        phone: dto.phone,
+        brokerageName: dto.brokerageName,
+      });
+
+      const hydratedUser = await this.loadUserOrFail(user.id);
+      return this.login(hydratedUser);
+    } catch (error) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw error;
+    }
+  }
+
+  async registerFranqueado(
+    dto: RegisterFranqueadoDto,
+  ): Promise<AuthResponse> {
+    await this.ensureEmailIsAvailable(dto.email);
+
+    const invite = await this.resolveInvite(
+      dto.inviteToken,
+      UserRole.FRANQUEADO,
+    );
+    const parent = await this.usersService.findById(invite.createdBy.id);
+    if (!parent) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw new BadRequestException('Convite inválido.');
+    }
+
+    try {
+      const passwordHash = await hash(dto.password, 10);
+      const user = await this.usersService.createBaseUser({
+        email: dto.email,
+        passwordHash,
+        role: UserRole.FRANQUEADO,
+        fullName: dto.fullName,
+        phone: dto.phone,
+        parent,
+      });
+
+      await this.usersService.attachFranqueadoProfile(user, {
+        companyName: dto.companyName,
+        document: dto.document,
+        region: dto.region,
+        notes: dto.notes,
+      });
+
+      const hydratedUser = await this.loadUserOrFail(user.id);
+      return this.login(hydratedUser);
+    } catch (error) {
+      await this.partnerLinksService.releaseInvite(invite);
+      throw error;
+    }
   }
 
   async refreshTokens(dto: RefreshTokenDto): Promise<AuthResponse> {
@@ -262,6 +352,15 @@ export class AuthService {
     await this.usersService.updatePassword(user.id, passwordHash);
 
     return { success: true };
+  }
+
+  private async resolveInvite(token: string, role: UserRole) {
+    if (!token) {
+      throw new BadRequestException(
+        'Convite inválido. Solicite um novo link ao responsável.',
+      );
+    }
+    return this.partnerLinksService.consumeInvite(token, role);
   }
 
   private async generateTokens(user: User): Promise<AuthTokens> {

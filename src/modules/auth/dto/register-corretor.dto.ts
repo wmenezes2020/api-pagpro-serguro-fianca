@@ -8,6 +8,10 @@ import {
 } from 'class-validator';
 
 export class RegisterCorretorDto {
+  @IsString()
+  @IsNotEmpty()
+  inviteToken: string;
+
   @IsEmail()
   email: string;
 

@@ -5,6 +5,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterImobiliariaDto } from './dto/register-imobiliaria.dto';
 import { RegisterInquilinoDto } from './dto/register-inquilino.dto';
 import { RegisterCorretorDto } from './dto/register-corretor.dto';
+import { RegisterFranqueadoDto } from './dto/register-franqueado.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -42,6 +43,13 @@ export class AuthController {
     @Body() dto: RegisterCorretorDto,
   ): Promise<AuthResponse> {
     return this.authService.registerCorretor(dto);
+  }
+
+  @Post('register/franqueado')
+  async registerFranqueado(
+    @Body() dto: RegisterFranqueadoDto,
+  ): Promise<AuthResponse> {
+    return this.authService.registerFranqueado(dto);
   }
 
   @Post('refresh')

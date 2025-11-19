@@ -36,6 +36,18 @@ INSERT INTO `cliente_psf_users` (
 ) ON DUPLICATE KEY UPDATE `email` = `email`;
 
 -- =====================================================
+-- REGRAS PADRÃO DE PAGAMENTO HIERÁRQUICO
+-- =====================================================
+INSERT INTO `payout_rules` (`id`, `role`, `percentage`, `createdAt`, `updatedAt`)
+VALUES
+  (UUID(), 'DIRECTOR', 10.00, NOW(), NOW()),
+  (UUID(), 'FRANQUEADO', 15.00, NOW(), NOW()),
+  (UUID(), 'IMOBILIARIA', 10.00, NOW(), NOW()),
+  (UUID(), 'CORRETOR', 5.00, NOW(), NOW()),
+  (UUID(), 'INQUILINO', 5.00, NOW(), NOW())
+ON DUPLICATE KEY UPDATE `percentage` = VALUES(`percentage`), `updatedAt` = NOW();
+
+-- =====================================================
 -- CREDENCIAIS DO ADMINISTRADOR
 -- =====================================================
 -- Email: admin@pagproseguro.com.br

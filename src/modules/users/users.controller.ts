@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ParseEnumPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +17,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateFranqueadoDto } from './dto/create-franqueado.dto';
+import { CreateImobiliariaDto } from './dto/create-imobiliaria.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,18 +52,53 @@ export class UsersController {
       return users.map((user) => this.usersService.sanitizeUser(user));
     }
 
-    // IMOBILIARIA pode listar apenas INQUILINO e CORRETOR
-    if (currentUser.role === UserRole.IMOBILIARIA) {
-      // Se role especificado, deve ser INQUILINO ou CORRETOR
-      if (role && ![UserRole.INQUILINO, UserRole.CORRETOR].includes(role)) {
-        return [];
-      }
-      // Se não especificado, retorna ambos
-      const users = await this.usersService.listUsers(role);
-      return users.map((user) => this.usersService.sanitizeUser(user));
+    const hierarchyPermissions: Partial<Record<UserRole, UserRole[]>> = {
+      [UserRole.DIRECTOR]: [
+        UserRole.FRANQUEADO,
+        UserRole.IMOBILIARIA,
+        UserRole.CORRETOR,
+      ],
+      [UserRole.FRANQUEADO]: [UserRole.IMOBILIARIA, UserRole.CORRETOR],
+      [UserRole.IMOBILIARIA]: [UserRole.CORRETOR, UserRole.INQUILINO],
+      [UserRole.CORRETOR]: [UserRole.INQUILINO],
+    };
+
+    const allowedRoles = hierarchyPermissions[currentUser.role];
+    if (!allowedRoles) {
+      return [];
     }
 
-    // Outros roles não têm permissão
-    return [];
+    if (role && !allowedRoles.includes(role)) {
+      return [];
+    }
+
+    const users = await this.usersService.listChildren(currentUser.id, role);
+    return users.map((user) => this.usersService.sanitizeUser(user));
+  }
+
+  @Post('franqueados')
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR)
+  async createFranqueado(
+    @CurrentUser() currentUser: User,
+    @Body() dto: CreateFranqueadoDto,
+  ) {
+    const created = await this.usersService.createFranqueadoChild(
+      currentUser,
+      dto,
+    );
+    return this.usersService.sanitizeUser(created);
+  }
+
+  @Post('imobiliarias')
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.FRANQUEADO)
+  async createImobiliaria(
+    @CurrentUser() currentUser: User,
+    @Body() dto: CreateImobiliariaDto,
+  ) {
+    const created = await this.usersService.createImobiliariaChild(
+      currentUser,
+      dto,
+    );
+    return this.usersService.sanitizeUser(created);
   }
 }

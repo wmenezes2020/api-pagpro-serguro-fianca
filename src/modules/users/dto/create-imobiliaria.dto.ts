@@ -1,6 +1,5 @@
 import {
   IsEmail,
-  IsNotEmpty,
   IsOptional,
   IsString,
   Length,
@@ -8,33 +7,13 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class RegisterImobiliariaDto {
+export class CreateImobiliariaDto {
   @IsString()
-  @IsNotEmpty()
-  inviteToken: string;
-
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  @MinLength(6)
-  password: string;
-
-  @IsString()
-  @Length(2, 120)
-  fullName: string;
-
-  @IsOptional()
-  @IsString()
-  @Length(8, 20)
-  phone?: string;
-
-  @IsString()
-  @IsNotEmpty()
+  @Length(2, 160)
   companyName: string;
 
   @IsString()
-  @Matches(/^\d{14}$/)
+  @Matches(/^\d{14}$/, { message: 'CNPJ deve conter 14 dígitos.' })
   cnpj: string;
 
   @IsOptional()
@@ -60,4 +39,21 @@ export class RegisterImobiliariaDto {
   @IsOptional()
   @IsString()
   postalCode?: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @IsString()
+  @Length(2, 120)
+  fullName: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(8, 20)
+  phone?: string;
 }
+

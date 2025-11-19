@@ -1,17 +1,12 @@
 import {
-  IsBoolean,
-  IsDateString,
   IsEmail,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
-  Matches,
-  Min,
   MinLength,
 } from 'class-validator';
 
-export class RegisterInquilinoDto {
+export class RegisterFranqueadoDto {
   @IsString()
   @IsNotEmpty()
   inviteToken: string;
@@ -28,25 +23,24 @@ export class RegisterInquilinoDto {
   fullName: string;
 
   @IsString()
-  @Matches(/^\d{11}$/)
-  cpf: string;
+  @IsNotEmpty()
+  companyName: string;
 
   @IsOptional()
-  @IsDateString()
-  birthDate?: string;
+  @IsString()
+  document?: string;
+
+  @IsOptional()
+  @IsString()
+  region?: string;
 
   @IsOptional()
   @IsString()
   phone?: string;
 
-  @IsNumber()
-  @Min(0)
-  monthlyIncome: number;
-
-  @IsBoolean()
-  hasNegativeRecords: boolean;
-
   @IsOptional()
   @IsString()
-  employmentStatus?: string;
+  notes?: string;
 }
+
+

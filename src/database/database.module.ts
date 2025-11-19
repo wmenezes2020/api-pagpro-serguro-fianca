@@ -18,7 +18,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         synchronize: false,
         migrationsRun: false,
         logging: configService.get<string>('app.env') !== 'production',
-        timezone: 'Z',
+        timezone: '-03:00', // America/Bahia (UTC-3)
       }),
     }),
   ],

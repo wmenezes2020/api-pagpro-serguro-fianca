@@ -12,6 +12,7 @@ import {
 import { CommissionsService } from './commissions.service';
 import { CreateCommissionRateDto } from './dto/create-commission-rate.dto';
 import { UpdateCommissionRateDto } from './dto/update-commission-rate.dto';
+import { UpdatePayoutRuleDto } from './dto/update-payout-rule.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -60,6 +61,21 @@ export class CommissionsController {
   async deleteCommissionRate(@Param('id') id: string) {
     await this.commissionsService.deleteCommissionRate(id);
     return { message: 'Taxa de comissão removida com sucesso' };
+  }
+
+  // Payout rules
+  @Get('payout-rules')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async listPayoutRules() {
+    return this.commissionsService.listPayoutRules();
+  }
+
+  @Put('payout-rules')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async updatePayoutRule(@Body() dto: UpdatePayoutRuleDto) {
+    return this.commissionsService.updatePayoutRule(dto);
   }
 
   // Commissions

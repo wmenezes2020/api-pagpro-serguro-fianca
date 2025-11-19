@@ -6,6 +6,7 @@ import { User } from './entities/user.entity';
 import { ImobiliariaProfile } from './entities/imobiliaria-profile.entity';
 import { InquilinoProfile } from './entities/inquilino-profile.entity';
 import { CorretorProfile } from './entities/corretor-profile.entity';
+import { FranqueadoProfile } from './entities/franqueado-profile.entity';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { CorretorProfile } from './entities/corretor-profile.entity';
       ImobiliariaProfile,
       InquilinoProfile,
       CorretorProfile,
+      FranqueadoProfile,
     ]),
   ],
   controllers: [UsersController],
