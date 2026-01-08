@@ -16,4 +16,7 @@ export const AppDataSource = new DataSource({
   migrations: [path.join(__dirname, '..', 'migrations', '*.{ts,js}')],
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
+  extra: {
+    connectTimeout: parseInt(process.env.DATABASE_CONNECT_TIMEOUT ?? '20000', 10),
+  },
 });

@@ -196,7 +196,7 @@ export class UsersService {
     refreshTokenHash: string | null,
   ): Promise<void> {
     await this.userRepository.update(userId, {
-      refreshTokenHash: refreshTokenHash ?? undefined,
+      refreshTokenHash,
     });
   }
 

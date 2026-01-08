@@ -42,7 +42,7 @@ export class User {
   phone?: string;
 
   @Column({ nullable: true })
-  refreshTokenHash?: string;
+  refreshTokenHash: string | null;
 
   @Column({ nullable: true })
   passwordResetToken?: string;

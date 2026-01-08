@@ -17,7 +17,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         autoLoadEntities: true,
         synchronize: false,
         migrationsRun: false,
-        logging: configService.get<string>('app.env') !== 'production',
+        // logging: configService.get<string>('app.env') !== 'production',
+        retryAttempts: Number(process.env.DATABASE_RETRY_ATTEMPTS ?? 5),
+        retryDelay: Number(process.env.DATABASE_RETRY_DELAY ?? 2000),
+        extra: {
+          connectTimeout: Number(process.env.DATABASE_CONNECT_TIMEOUT ?? 20000),
+        },
         timezone: '-03:00', // America/Bahia (UTC-3)
       }),
     }),
