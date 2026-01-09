@@ -41,4 +41,12 @@ export default registerAs('app', () => ({
   notification: {
     emailTo: process.env.NOTIFICATION_EMAIL_TO,
   },
+  whatsapp: {
+    enabled: process.env.WHATSAPP_ENABLED === 'true',
+    apiUrl: process.env.WHATSAPP_API_URL,
+    apiKey: process.env.WHATSAPP_API_KEY,
+    evolutionApiUrl: process.env.EVOLUTION_API_URL,
+    evolutionApiKey: process.env.EVOLUTION_API_KEY,
+    instanceName: process.env.WHATSAPP_INSTANCE_NAME || 'pagpro-seguro-fianca-default',
+  },
 }));

@@ -30,11 +30,29 @@ export class PaymentSchedule {
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
   status: PaymentStatus;
 
+  @Column({ type: 'enum', enum: ['BOLETO', 'PIX'], default: 'BOLETO' })
+  paymentMethod: 'BOLETO' | 'PIX';
+
   @Column({ type: 'timestamp', nullable: true })
   paidAt?: Date;
 
   @Column({ nullable: true })
   paymentReference?: string;
+
+  @Column({ nullable: true })
+  barcode?: string;
+
+  @Column({ type: 'text', nullable: true })
+  qrCode?: string;
+
+  @Column({ nullable: true })
+  qrCodeImageUrl?: string;
+
+  @Column({ nullable: true })
+  externalPaymentId?: string;
+
+  @Column({ type: 'json', nullable: true })
+  paymentMetadata?: Record<string, unknown>;
 
   @Column({ nullable: true })
   notes?: string;

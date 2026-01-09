@@ -36,4 +36,18 @@ export const validationSchema = Joi.object({
     .default('noreply@pagproseguro.com.br'),
   SMTP_FROM_NAME: Joi.string().default('PagPro Seguro Fiança'),
   NOTIFICATION_EMAIL_TO: Joi.string().allow('', null).optional(),
+  // WhatsApp Configuration
+  WHATSAPP_ENABLED: Joi.string().valid('true', 'false').default('false'),
+  WHATSAPP_API_URL: Joi.string().allow('', null).optional(),
+  WHATSAPP_API_KEY: Joi.string().allow('', null).optional(),
+  // Evolution API Configuration
+  EVOLUTION_API_URL: Joi.string()
+    .default('https://api-whatsapp.edeniva.com.br')
+    .allow('', null)
+    .optional(),
+  EVOLUTION_API_KEY: Joi.string().allow('', null).optional(),
+  WHATSAPP_INSTANCE_NAME: Joi.string()
+    .default('pagpro-seguro-fianca-default')
+    .allow('', null)
+    .optional(),
 });

@@ -50,6 +50,15 @@ export class RentalApplication {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   monthlyIncome: number;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  monthlyRentValue?: number;
+
+  @Column({ type: 'enum', enum: ['COMERCIAL', 'RESIDENCIAL'], nullable: true })
+  contractType?: 'COMERCIAL' | 'RESIDENCIAL';
+
+  @Column({ type: 'enum', enum: ['PF', 'PJ'], nullable: true })
+  tenantType?: 'PF' | 'PJ';
+
   @Column({ default: false })
   hasNegativeRecords: boolean;
 

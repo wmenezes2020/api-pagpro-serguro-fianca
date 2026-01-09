@@ -17,6 +17,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateFranqueadoDto } from './dto/create-franqueado.dto';
 import { CreateImobiliariaDto } from './dto/create-imobiliaria.dto';
 import { CreateCorretorDto } from './dto/create-corretor.dto';
+import { CreateInquilinoDto } from './dto/create-inquilino.dto';
 
 interface CreateBaseUserPayload {
   email: string;
@@ -450,6 +451,46 @@ export class UsersService {
     const created = await this.findById(user.id);
     if (!created) {
       throw new NotFoundException('Não foi possível carregar o corretor.');
+    }
+    return created;
+  }
+
+  async createInquilinoChild(
+    parent: User,
+    dto: CreateInquilinoDto,
+  ): Promise<User> {
+    const existingEmail = await this.findByEmail(dto.email);
+    if (existingEmail) {
+      throw new ConflictException('E-mail já está cadastrado.');
+    }
+
+    if (await this.isCpfInUse(dto.cpf)) {
+      throw new ConflictException('CPF já está cadastrado.');
+    }
+
+    const passwordHash = await hash(dto.password, 10);
+    const user = await this.createBaseUser({
+      email: dto.email,
+      passwordHash,
+      role: UserRole.INQUILINO,
+      fullName: dto.fullName,
+      phone: dto.phone,
+      parent,
+    });
+
+    await this.attachInquilinoProfile(user, {
+      fullName: dto.fullName,
+      cpf: dto.cpf,
+      birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
+      phone: dto.phone,
+      monthlyIncome: dto.monthlyIncome ?? 0,
+      hasNegativeRecords: false,
+      employmentStatus: dto.employmentStatus,
+    });
+
+    const created = await this.findById(user.id);
+    if (!created) {
+      throw new NotFoundException('Não foi possível carregar o inquilino.');
     }
     return created;
   }

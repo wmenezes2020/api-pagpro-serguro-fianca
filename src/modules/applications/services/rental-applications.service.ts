@@ -74,8 +74,11 @@ export class RentalApplicationsService {
       property,
       applicant,
       broker,
-      requestedRentValue: Number(property.rentValue),
+      requestedRentValue: dto.monthlyRentValue ?? Number(property.rentValue),
       monthlyIncome: dto.monthlyIncome,
+      monthlyRentValue: dto.monthlyRentValue,
+      contractType: dto.contractType,
+      tenantType: dto.tenantType,
       hasNegativeRecords: dto.hasNegativeRecords,
       employmentStatus: dto.employmentStatus,
       documents: dto.documents,
@@ -237,65 +240,152 @@ export class RentalApplicationsService {
   }
 
   async getDashboardMetrics(user: User) {
-    const query = this.applicationsRepository
-      .createQueryBuilder('application')
-      .leftJoinAndSelect('application.property', 'property')
-      .leftJoinAndSelect('application.applicant', 'applicant')
-      .leftJoinAndSelect('application.creditAnalysis', 'creditAnalysis')
-      .leftJoinAndSelect('application.insurancePolicy', 'insurancePolicy')
-      .leftJoinAndSelect('insurancePolicy.paymentSchedule', 'paymentSchedule');
+    try {
+      const query = this.applicationsRepository
+        .createQueryBuilder('application')
+        .leftJoinAndSelect('application.property', 'property')
+        .leftJoinAndSelect('application.applicant', 'applicant')
+        .leftJoinAndSelect('application.creditAnalysis', 'creditAnalysis')
+        .leftJoinAndSelect('application.insurancePolicy', 'insurancePolicy')
+        .leftJoinAndSelect('insurancePolicy.paymentSchedule', 'paymentSchedule');
 
-    if (user.role === UserRole.IMOBILIARIA) {
-      query.where('property.ownerId = :ownerId', { ownerId: user.id });
-    } else if (user.role === UserRole.INQUILINO) {
-      query.where('application.applicantId = :tenantId', { tenantId: user.id });
-    } else if (user.role === UserRole.CORRETOR) {
-      query.where('application.brokerId = :brokerId', { brokerId: user.id });
+      if (user.role === UserRole.IMOBILIARIA) {
+        query.where('property.ownerId = :ownerId', { ownerId: user.id });
+      } else if (user.role === UserRole.INQUILINO) {
+        query.where('application.applicantId = :tenantId', { tenantId: user.id });
+      } else if (user.role === UserRole.CORRETOR) {
+        query.where('application.brokerId = :brokerId', { brokerId: user.id });
+      }
+
+      const applications = await query
+        .orderBy('application.createdAt', 'DESC')
+        .getMany();
+
+      const approvals = applications.filter(
+        (app) => app.status === ApplicationStatus.APPROVED,
+      ).length;
+
+      // Validar applicant antes de acessar id
+      const uniqueApplicants = new Set(
+        applications
+          .map((app) => app.applicant?.id)
+          .filter((id): id is string => Boolean(id)),
+      ).size;
+
+      const allPayments = applications
+        .flatMap((app) => app.insurancePolicy?.paymentSchedule ?? [])
+        .filter(Boolean);
+
+      const overdueCount = allPayments.filter(
+        (payment) => payment.status === PaymentStatus.OVERDUE,
+      ).length;
+      const paidCount = allPayments.filter(
+        (payment) => payment.status === PaymentStatus.PAID,
+      ).length;
+      const totalPayments = overdueCount + paidCount;
+      const defaultRate = totalPayments > 0 ? overdueCount / totalPayments : 0;
+
+      const scores = applications
+        .map((app) => app.creditAnalysis?.score)
+        .filter((score): score is number => typeof score === 'number' && !isNaN(score));
+      const averageScore =
+        scores.length > 0
+          ? Number(
+              (
+                scores.reduce((sum, score) => sum + score, 0) / scores.length
+              ).toFixed(2),
+            )
+          : null;
+
+      // Calcular Taxa de Aprovação
+      const approvalRate =
+        applications.length > 0 ? (approvals / applications.length) * 100 : 0;
+
+      // Calcular Total de Entregas (valor financeiro das apólices aprovadas)
+      const totalDeliveries = applications
+        .filter((app) => app.status === ApplicationStatus.APPROVED)
+        .reduce((sum, app) => {
+          const coverageAmount = app.insurancePolicy?.coverageAmount ?? 0;
+          return sum + Number(coverageAmount || 0);
+        }, 0);
+
+      // Dados históricos para gráficos (últimos 6 meses)
+      const monthlyData: Array<{
+        month: string;
+        approvalRate: number;
+        defaultRate: number;
+        totalApplications: number;
+        approvals: number;
+      }> = [];
+      const now = new Date();
+      
+      for (let i = 5; i >= 0; i--) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        monthStart.setHours(0, 0, 0, 0);
+
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
+
+        const monthApplications = applications.filter((app) => {
+          if (!app.createdAt) return false;
+          const appDate = new Date(app.createdAt);
+          return appDate >= monthStart && appDate <= monthEnd;
+        });
+
+        const monthApprovals = monthApplications.filter(
+          (app) => app.status === ApplicationStatus.APPROVED,
+        ).length;
+
+        const monthApprovalRate =
+          monthApplications.length > 0
+            ? (monthApprovals / monthApplications.length) * 100
+            : 0;
+
+        const monthPayments = monthApplications
+          .flatMap((app) => app.insurancePolicy?.paymentSchedule ?? [])
+          .filter(Boolean);
+
+        const monthOverdue = monthPayments.filter(
+          (payment) => payment.status === PaymentStatus.OVERDUE,
+        ).length;
+
+        const monthDefaultRate =
+          monthPayments.length > 0 ? (monthOverdue / monthPayments.length) * 100 : 0;
+
+        const monthName = monthStart.toLocaleDateString('pt-BR', { month: 'short' });
+        monthlyData.push({
+          month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+          approvalRate: Number(monthApprovalRate.toFixed(1)),
+          defaultRate: Number(monthDefaultRate.toFixed(1)),
+          totalApplications: monthApplications.length,
+          approvals: monthApprovals,
+        });
+      }
+
+      return {
+        approvals,
+        totalApplications: applications.length,
+        clients: uniqueApplicants,
+        defaultRate: Number((defaultRate * 100).toFixed(1)), // Converter para porcentagem
+        averageScore,
+        approvalRate: Number(approvalRate.toFixed(1)), // Taxa de aprovação em %
+        totalDeliveries: Number(totalDeliveries.toFixed(2)), // Total de entregas em valor
+        monthlyTrends: monthlyData, // Dados históricos para gráficos
+      };
+    } catch (error) {
+      console.error('Erro ao calcular métricas do dashboard:', error);
+      // Retornar valores padrão em caso de erro
+      return {
+        approvals: 0,
+        totalApplications: 0,
+        clients: 0,
+        defaultRate: 0,
+        averageScore: null,
+        approvalRate: 0,
+        totalDeliveries: 0,
+        monthlyTrends: [],
+      };
     }
-
-    const applications = await query
-      .orderBy('application.createdAt', 'DESC')
-      .getMany();
-
-    const approvals = applications.filter(
-      (app) => app.status === ApplicationStatus.APPROVED,
-    ).length;
-    const uniqueApplicants = new Set(
-      applications.map((app) => app.applicant.id),
-    ).size;
-
-    const allPayments = applications
-      .flatMap((app) => app.insurancePolicy?.paymentSchedule ?? [])
-      .filter(Boolean);
-
-    const overdueCount = allPayments.filter(
-      (payment) => payment.status === PaymentStatus.OVERDUE,
-    ).length;
-    const paidCount = allPayments.filter(
-      (payment) => payment.status === PaymentStatus.PAID,
-    ).length;
-    const totalPayments = overdueCount + paidCount;
-    const defaultRate = totalPayments > 0 ? overdueCount / totalPayments : 0;
-
-    const scores = applications
-      .map((app) => app.creditAnalysis?.score)
-      .filter((score): score is number => typeof score === 'number');
-    const averageScore =
-      scores.length > 0
-        ? Number(
-            (
-              scores.reduce((sum, score) => sum + score, 0) / scores.length
-            ).toFixed(2),
-          )
-        : null;
-
-    return {
-      approvals,
-      totalApplications: applications.length,
-      clients: uniqueApplicants,
-      defaultRate,
-      averageScore,
-    };
   }
 
   private async evaluateApplication(id: string): Promise<RentalApplication> {

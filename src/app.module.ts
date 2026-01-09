@@ -14,6 +14,7 @@ import { ImobiliariaBrokersModule } from './modules/imobiliaria-brokers/imobilia
 import { AIModule } from './modules/ai/ai.module';
 import { CommissionsModule } from './modules/commissions/commissions.module';
 import { PartnerLinksModule } from './modules/partner-links/partner-links.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -36,6 +37,7 @@ import { AppService } from './app.service';
     AIModule,
     CommissionsModule,
     PartnerLinksModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

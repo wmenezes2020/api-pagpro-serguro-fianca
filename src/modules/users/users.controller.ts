@@ -20,6 +20,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateFranqueadoDto } from './dto/create-franqueado.dto';
 import { CreateImobiliariaDto } from './dto/create-imobiliaria.dto';
 import { CreateCorretorDto } from './dto/create-corretor.dto';
+import { CreateInquilinoDto } from './dto/create-inquilino.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -110,6 +111,19 @@ export class UsersController {
     @Body() dto: CreateCorretorDto,
   ) {
     const created = await this.usersService.createCorretorChild(
+      currentUser,
+      dto,
+    );
+    return this.usersService.sanitizeUser(created);
+  }
+
+  @Post('inquilinos')
+  @Roles(UserRole.ADMIN, UserRole.DIRECTOR, UserRole.FRANQUEADO, UserRole.IMOBILIARIA, UserRole.CORRETOR)
+  async createInquilino(
+    @CurrentUser() currentUser: User,
+    @Body() dto: CreateInquilinoDto,
+  ) {
+    const created = await this.usersService.createInquilinoChild(
       currentUser,
       dto,
     );

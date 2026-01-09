@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -22,6 +23,19 @@ export class CreateRentalApplicationDto {
   @IsNumber()
   @Min(0)
   monthlyIncome: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  monthlyRentValue?: number;
+
+  @IsOptional()
+  @IsEnum(['COMERCIAL', 'RESIDENCIAL'])
+  contractType?: 'COMERCIAL' | 'RESIDENCIAL';
+
+  @IsOptional()
+  @IsEnum(['PF', 'PJ'])
+  tenantType?: 'PF' | 'PJ';
 
   @IsBoolean()
   hasNegativeRecords: boolean;

@@ -24,6 +24,11 @@ import * as path from 'path';
         retryDelay: Number(process.env.DATABASE_RETRY_DELAY ?? 2000),
         extra: {
           connectTimeout: Number(process.env.DATABASE_CONNECT_TIMEOUT ?? 20000),
+          // Configurações de pool para evitar ECONNRESET
+          connectionLimit: 10,
+          // Manter conexões vivas
+          keepAliveInitialDelay: 0,
+          enableKeepAlive: true,
         },
         timezone: '-03:00', // America/Bahia (UTC-3)
       }),
