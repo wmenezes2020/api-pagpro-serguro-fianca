@@ -42,4 +42,3 @@ export class CreateFranqueadoDto {
   @IsString()
   notes?: string;
 }
-

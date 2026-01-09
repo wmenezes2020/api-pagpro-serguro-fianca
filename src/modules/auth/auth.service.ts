@@ -21,6 +21,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { PartnerLinksService } from '../partner-links/partner-links.service';
 import { PartnerLink } from '../partner-links/entities/partner-link.entity';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { EmailNotificationService } from '../notifications/email-notification.service';
 
 export interface TokenPayload {
   sub: string;
@@ -45,6 +46,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly partnerLinksService: PartnerLinksService,
+    private readonly emailNotificationService: EmailNotificationService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<User> {
@@ -52,6 +54,13 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException(
         'Credenciais inválidas. Verifique seu email e senha.',
+      );
+    }
+
+    // Ensure user has an id - if not, this is a critical error
+    if (!user.id) {
+      throw new UnauthorizedException(
+        'Erro ao carregar dados do usuário. Tente novamente.',
       );
     }
 
@@ -72,6 +81,9 @@ export class AuthService {
   }
 
   async login(user: User): Promise<AuthResponse> {
+    if (!user?.id) {
+      throw new Error('User ID is missing. Cannot update last login.');
+    }
     await this.usersService.updateLastLogin(user.id);
     const tokens = await this.generateTokens(user);
     await this.usersService.setRefreshToken(
@@ -217,9 +229,7 @@ export class AuthService {
     }
   }
 
-  async registerFranqueado(
-    dto: RegisterFranqueadoDto,
-  ): Promise<AuthResponse> {
+  async registerFranqueado(dto: RegisterFranqueadoDto): Promise<AuthResponse> {
     await this.ensureEmailIsAvailable(dto.email);
 
     const invite = await this.resolveInvite(
@@ -314,6 +324,12 @@ export class AuthService {
       return { success: true };
     }
 
+    // Verificar se o usuário tem ID válido
+    if (!user.id) {
+      console.error('Usuário encontrado mas sem ID válido:', user.email);
+      return { success: true }; // Por segurança, retornar sucesso mesmo com erro
+    }
+
     const resetToken = randomBytes(32).toString('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1); // Token válido por 1 hora
@@ -324,13 +340,16 @@ export class AuthService {
       expiresAt,
     );
 
-    // TODO: Integrar com serviço de email real (SendGrid, AWS SES, etc.)
-    const resetUrl = `${this.configService.get<string>(
-      'app.frontendUrl',
-    )}/reset-password?token=${resetToken}`;
-
-    // Placeholder: Em produção, enviar email aqui
-    console.log(`Password reset link for ${user.email}: ${resetUrl}`);
+    // Enviar email de recuperação de senha
+    try {
+      await this.emailNotificationService.sendPasswordResetEmail(
+        user,
+        resetToken,
+      );
+    } catch (error) {
+      // Log do erro mas não falha o processo
+      console.error('Erro ao enviar email de recuperação de senha:', error);
+    }
 
     return { success: true };
   }
@@ -355,10 +374,7 @@ export class AuthService {
     return { success: true };
   }
 
-  async changePassword(
-    userId: string,
-    dto: UpdatePasswordDto,
-  ): Promise<void> {
+  async changePassword(userId: string, dto: UpdatePasswordDto): Promise<void> {
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException('Usuário não encontrado.');

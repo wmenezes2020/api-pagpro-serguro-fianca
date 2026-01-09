@@ -26,7 +26,7 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  @Column({ type: 'varchar', length: 255 })
   passwordHash: string;
 
   @Column({ type: 'enum', enum: UserRole })
@@ -41,10 +41,10 @@ export class User {
   @Column({ nullable: true })
   phone?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   refreshTokenHash: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   passwordResetToken?: string;
 
   @Column({ type: 'timestamp', nullable: true })

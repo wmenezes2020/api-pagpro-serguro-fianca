@@ -38,4 +38,3 @@ export class Referral {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

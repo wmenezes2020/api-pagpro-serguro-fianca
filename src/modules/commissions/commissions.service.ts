@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Commission } from './entities/commission.entity';
@@ -91,7 +87,10 @@ export class CommissionsService implements OnModuleInit {
       (await this.payoutRuleRepository.findOne({
         where: { role: dto.role },
       })) ??
-      this.payoutRuleRepository.create({ role: dto.role, percentage: dto.percentage });
+      this.payoutRuleRepository.create({
+        role: dto.role,
+        percentage: dto.percentage,
+      });
 
     existing.percentage = dto.percentage;
     const saved = await this.payoutRuleRepository.save(existing);
@@ -307,4 +306,3 @@ export class CommissionsService implements OnModuleInit {
     }
   }
 }
-

@@ -46,5 +46,3 @@ export class PartnerLink {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-

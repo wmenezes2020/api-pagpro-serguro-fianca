@@ -24,5 +24,3 @@ export class PayoutRule {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-

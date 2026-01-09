@@ -11,5 +11,3 @@ import { PartnerLinksController } from './partner-links.controller';
   exports: [PartnerLinksService],
 })
 export class PartnerLinksModule {}
-
-

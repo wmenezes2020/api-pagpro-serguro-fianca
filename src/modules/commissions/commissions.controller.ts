@@ -112,4 +112,3 @@ export class CommissionsController {
     return this.commissionsService.findAllReferrals(userId);
   }
 }
-

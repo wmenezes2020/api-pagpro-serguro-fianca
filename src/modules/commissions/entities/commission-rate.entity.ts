@@ -33,4 +33,3 @@ export class CommissionRate {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

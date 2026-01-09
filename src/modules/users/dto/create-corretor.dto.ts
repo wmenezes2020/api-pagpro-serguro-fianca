@@ -36,4 +36,3 @@ export class CreateCorretorDto {
   @IsString()
   brokerageName?: string;
 }
-

@@ -17,6 +17,9 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
   extra: {
-    connectTimeout: parseInt(process.env.DATABASE_CONNECT_TIMEOUT ?? '20000', 10),
+    connectTimeout: parseInt(
+      process.env.DATABASE_CONNECT_TIMEOUT ?? '20000',
+      10,
+    ),
   },
 });

@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { hash } from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { User } from './entities/user.entity';
 import { ImobiliariaProfile } from './entities/imobiliaria-profile.entity';
 import { InquilinoProfile } from './entities/inquilino-profile.entity';
@@ -134,15 +135,96 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { email: email.toLowerCase() },
+    const normalizedEmail = email.toLowerCase();
+    
+    // Usa query SQL direta para garantir que pegamos o ID do banco
+    const rawResult = await this.userRepository.query(
+      `SELECT id, email, passwordHash, fullName, phone, role, isActive, 
+              refreshTokenHash, passwordResetToken, passwordResetTokenExpiresAt, 
+              lastLoginAt, createdAt, updatedAt, parent_user_id
+       FROM cliente_psf_users 
+       WHERE email = ? 
+       LIMIT 1`,
+      [normalizedEmail],
+    );
+    
+    if (!rawResult || rawResult.length === 0) {
+      return null;
+    }
+    
+    const row = rawResult[0];
+    
+    // Verifica se o ID é válido
+    if (!row.id || row.id === '' || row.id.trim() === '') {
+      console.error('❌ CRÍTICO: Usuário encontrado sem ID válido no banco:', {
+        email: normalizedEmail,
+        role: row.role,
+      });
+      
+      // Tenta corrigir automaticamente gerando um UUID
+      try {
+        const newId = randomUUID();
+        
+        await this.userRepository.query(
+          `UPDATE cliente_psf_users SET id = ? WHERE email = ?`,
+          [newId, normalizedEmail],
+        );
+        
+        console.log('✅ ID corrigido automaticamente para usuário:', normalizedEmail);
+        row.id = newId;
+      } catch (error) {
+        console.error('❌ Erro ao corrigir ID do usuário:', error);
+        return null;
+      }
+    }
+    
+    // Constrói o objeto User a partir do resultado raw
+    const user = this.userRepository.create({
+      id: row.id,
+      email: row.email,
+      passwordHash: row.passwordHash,
+      fullName: row.fullName,
+      phone: row.phone,
+      role: row.role,
+      isActive: row.isActive === 1 || row.isActive === true,
+      refreshTokenHash: row.refreshTokenHash,
+      passwordResetToken: row.passwordResetToken,
+      passwordResetTokenExpiresAt: row.passwordResetTokenExpiresAt
+        ? new Date(row.passwordResetTokenExpiresAt)
+        : undefined,
+      lastLoginAt: row.lastLoginAt ? new Date(row.lastLoginAt) : undefined,
+      createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(),
     });
+    
+    // Se tem parent_user_id, carrega o parent
+    if (row.parent_user_id) {
+      const parent = await this.findById(row.parent_user_id);
+      if (parent) {
+        user.parent = parent;
+      }
+    }
+    
+    return user;
   }
 
   async findByPasswordResetToken(token: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { passwordResetToken: token },
-    });
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.email',
+        'user.passwordHash',
+        'user.fullName',
+        'user.phone',
+        'user.role',
+        'user.isActive',
+        'user.passwordResetToken',
+        'user.passwordResetTokenExpiresAt',
+      ])
+      .where('user.passwordResetToken = :token', { token })
+      .getOne();
+    return user;
   }
 
   async findById(id: string): Promise<User | null> {
@@ -156,11 +238,23 @@ export class UsersService {
     if (role) {
       return this.userRepository.find({
         where: { role },
-        relations: ['parent', 'franqueadoProfile', 'imobiliariaProfile', 'corretorProfile', 'inquilinoProfile'],
+        relations: [
+          'parent',
+          'franqueadoProfile',
+          'imobiliariaProfile',
+          'corretorProfile',
+          'inquilinoProfile',
+        ],
       });
     }
     return this.userRepository.find({
-      relations: ['parent', 'franqueadoProfile', 'imobiliariaProfile', 'corretorProfile', 'inquilinoProfile'],
+      relations: [
+        'parent',
+        'franqueadoProfile',
+        'imobiliariaProfile',
+        'corretorProfile',
+        'inquilinoProfile',
+      ],
     });
   }
 
@@ -171,7 +265,13 @@ export class UsersService {
     }
     return this.userRepository.find({
       where,
-      relations: ['parent', 'franqueadoProfile', 'imobiliariaProfile', 'corretorProfile', 'inquilinoProfile'],
+      relations: [
+        'parent',
+        'franqueadoProfile',
+        'imobiliariaProfile',
+        'corretorProfile',
+        'inquilinoProfile',
+      ],
     });
   }
 
@@ -186,7 +286,10 @@ export class UsersService {
   }
 
   async updateLastLogin(id: string): Promise<void> {
-    await this.userRepository.update(id, {
+    if (!id) {
+      throw new Error('User ID is required to update last login');
+    }
+    await this.userRepository.update({ id }, {
       lastLoginAt: new Date(),
     });
   }
@@ -195,7 +298,10 @@ export class UsersService {
     userId: string,
     refreshTokenHash: string | null,
   ): Promise<void> {
-    await this.userRepository.update(userId, {
+    if (!userId) {
+      throw new Error('User ID is required to set refresh token');
+    }
+    await this.userRepository.update({ id: userId }, {
       refreshTokenHash,
     });
   }
@@ -205,21 +311,30 @@ export class UsersService {
     token: string,
     expiresAt: Date,
   ): Promise<void> {
-    await this.userRepository.update(userId, {
+    if (!userId) {
+      throw new Error('User ID is required to set password reset token');
+    }
+    await this.userRepository.update({ id: userId }, {
       passwordResetToken: token,
       passwordResetTokenExpiresAt: expiresAt,
     });
   }
 
   async clearPasswordResetToken(userId: string): Promise<void> {
-    await this.userRepository.update(userId, {
+    if (!userId) {
+      throw new Error('User ID is required to clear password reset token');
+    }
+    await this.userRepository.update({ id: userId }, {
       passwordResetToken: undefined,
       passwordResetTokenExpiresAt: undefined,
     });
   }
 
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
-    await this.userRepository.update(userId, {
+    if (!userId) {
+      throw new Error('User ID is required to update password');
+    }
+    await this.userRepository.update({ id: userId }, {
       passwordHash,
       passwordResetToken: undefined,
       passwordResetTokenExpiresAt: undefined,
@@ -360,4 +475,3 @@ export class UsersService {
     return rest;
   }
 }
-

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import * as path from 'path';
 
 @Module({
   imports: [
@@ -15,8 +16,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         password: configService.get<string>('app.database.password'),
         database: configService.get<string>('app.database.name'),
         autoLoadEntities: true,
-        synchronize: false,
-        migrationsRun: false,
+        synchronize: true,
+        migrationsRun: true,
+        migrations: [path.join(__dirname, '..', 'migrations', '*.{ts,js}')],
         // logging: configService.get<string>('app.env') !== 'production',
         retryAttempts: Number(process.env.DATABASE_RETRY_ATTEMPTS ?? 5),
         retryDelay: Number(process.env.DATABASE_RETRY_DELAY ?? 2000),

@@ -89,7 +89,10 @@ export class PartnerLinksService {
       );
     }
 
-    if (dto.targetRole && !this.canInvite(link.createdBy.role, dto.targetRole)) {
+    if (
+      dto.targetRole &&
+      !this.canInvite(link.createdBy.role, dto.targetRole)
+    ) {
       throw new ForbiddenException(
         'Você não possui permissão para criar convites para este perfil.',
       );
@@ -152,7 +155,10 @@ export class PartnerLinksService {
     };
   }
 
-  async consumeInvite(token: string, expectedRole: UserRole): Promise<PartnerLink> {
+  async consumeInvite(
+    token: string,
+    expectedRole: UserRole,
+  ): Promise<PartnerLink> {
     const link = await this.partnerLinksRepository.findOne({
       where: { token },
       relations: ['createdBy'],
@@ -201,13 +207,8 @@ export class PartnerLinksService {
     await this.partnerLinksRepository.save(entity);
   }
 
-  private canInvite(
-    issuerRole: UserRole,
-    targetRole: UserRole,
-  ): boolean {
+  private canInvite(issuerRole: UserRole, targetRole: UserRole): boolean {
     const allowed = INVITE_PERMISSIONS[issuerRole] ?? [];
     return allowed.includes(targetRole);
   }
 }
-
-

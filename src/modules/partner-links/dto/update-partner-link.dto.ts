@@ -31,4 +31,3 @@ export class UpdatePartnerLinkDto {
   @IsOptional()
   isActive?: boolean;
 }
-

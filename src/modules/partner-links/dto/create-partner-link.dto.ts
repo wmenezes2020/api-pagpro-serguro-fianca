@@ -27,5 +27,3 @@ export class CreatePartnerLinkDto {
   @IsString()
   notes?: string;
 }
-
-

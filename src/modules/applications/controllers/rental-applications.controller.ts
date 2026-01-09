@@ -6,8 +6,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { RentalApplicationsService } from '../services/rental-applications.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -19,8 +22,6 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { UserRole } from '../../../common/enums/user-role.enum';
 import { UpdatePaymentStatusDto } from '../dto/update-payment-status.dto';
 import { DocumentsService } from '../../documents/documents.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { UploadedFile, UseInterceptors } from '@nestjs/common';
 
 @Controller('applications')
 @UseGuards(JwtAuthGuard, RolesGuard)

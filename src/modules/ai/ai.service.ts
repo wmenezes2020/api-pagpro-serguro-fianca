@@ -1,65 +1,44 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
 import { RentalApplication } from '../applications/entities/rental-application.entity';
 import { Document } from '../documents/entities/document.entity';
 import { ScoringResult } from '../applications/services/rental-applications.service';
 import { RiskLevel } from '../../common/enums/risk-level.enum';
 import { ApplicationStatus } from '../../common/enums/application-status.enum';
+import { LLMUnifiedService } from './services/llm-unified.service';
 
 @Injectable()
 export class AIService implements OnModuleInit {
   private readonly logger = new Logger(AIService.name);
-  private openai: OpenAI | null = null;
   private isConfigured = false;
-  private model: string;
 
-  constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    this.model =
-      this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o-mini';
-
-    if (apiKey && !this.isPlaceholder(apiKey)) {
-      try {
-        this.openai = new OpenAI({
-          apiKey,
-        });
-        this.isConfigured = true;
-        this.logger.log('OpenAI configurado com sucesso');
-      } catch (error) {
-        this.logger.warn(
-          'Falha ao inicializar OpenAI. Análise por IA estará desabilitada.',
-        );
-        this.logger.debug(error.message);
-      }
-    } else {
-      this.logger.warn(
-        'OPENAI_API_KEY não configurada ou é um placeholder. Análise por IA estará desabilitada.',
-      );
-    }
-  }
+  constructor(private readonly llmUnifiedService: LLMUnifiedService) {}
 
   async onModuleInit() {
-    if (this.isConfigured) {
-      this.logger.log(
-        `Serviço de IA inicializado com modelo: ${this.model}`,
+    try {
+      // Verificar se há LLMs disponíveis
+      const supportedLLMs = this.llmUnifiedService.getSupportedLLMs();
+      if (supportedLLMs.length > 0) {
+        this.isConfigured = true;
+        this.logger.log(
+          `Serviço de IA inicializado com LLMs dinâmicos: ${supportedLLMs.join(', ')}`,
+        );
+      } else {
+        this.logger.warn(
+          'Nenhum LLM configurado. Configure credenciais no banco de dados.',
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        'Falha ao inicializar serviço de IA. Análise por IA estará desabilitada.',
       );
+      this.logger.debug(error.message);
     }
-  }
-
-  private isPlaceholder(apiKey: string): boolean {
-    return (
-      apiKey.includes('your_api_key') ||
-      apiKey.includes('placeholder') ||
-      apiKey.includes('sk-placeholder') ||
-      apiKey.length < 20
-    );
   }
 
   private ensureConfigured() {
-    if (!this.isConfigured || !this.openai) {
+    if (!this.isConfigured) {
       throw new Error(
-        'OpenAI não está configurado. Configure OPENAI_API_KEY no arquivo .env',
+        'Serviço de IA não está configurado. Configure credenciais de LLM no banco de dados.',
       );
     }
   }
@@ -67,35 +46,42 @@ export class AIService implements OnModuleInit {
   async analyzeCreditApplication(
     application: RentalApplication,
     documents: Document[],
+    companyId?: string,
   ): Promise<ScoringResult> {
     this.ensureConfigured();
 
-    const prompt = this.buildAnalysisPrompt(application, documents);
+    const systemPrompt = this.getSystemPrompt();
+    const userPrompt = this.buildAnalysisPrompt(application, documents);
+
+    // Combinar system e user prompt para LLMs que não suportam system messages
+    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
     try {
-      const completion = await this.openai!.chat.completions.create({
-        model: this.model,
-        messages: [
+      // Usar LLM dinâmico (preferencialmente Gemini, com fallback para OpenAI)
+      const responseContent =
+        await this.llmUnifiedService.generateGeminiResponse(
+          fullPrompt,
+          companyId,
           {
-            role: 'system',
-            content: this.getSystemPrompt(),
+            temperature: 0.3, // Baixa temperatura para análises mais consistentes
+            maxTokens: 2000,
           },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.3, // Baixa temperatura para análises mais consistentes
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
-      });
+        );
 
-      const responseContent = completion.choices[0]?.message?.content;
       if (!responseContent) {
-        throw new Error('Resposta vazia da OpenAI');
+        throw new Error('Resposta vazia do LLM');
       }
 
-      const analysisResult = JSON.parse(responseContent);
+      // Tentar extrair JSON da resposta (pode estar em markdown code blocks)
+      let jsonContent = responseContent.trim();
+
+      // Remover markdown code blocks se existirem
+      const jsonMatch = jsonContent.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+      if (jsonMatch) {
+        jsonContent = jsonMatch[1];
+      }
+
+      const analysisResult = JSON.parse(jsonContent);
       return this.parseAIResponse(analysisResult, application);
     } catch (error) {
       this.logger.error('Erro ao analisar aplicação com IA', error.stack);
@@ -264,7 +250,7 @@ Retorne APENAS o JSON conforme especificado no prompt do sistema.`;
       hasNegativeRecords: application.hasNegativeRecords,
       employmentStatus: application.employmentStatus,
       aiGenerated: true,
-      aiModel: this.model,
+      aiModel: aiResponse.aiModel || 'dynamic-llm',
       aiNotes: aiResponse.analystNotes || 'Análise gerada por IA',
     };
 
@@ -286,7 +272,6 @@ Retorne APENAS o JSON conforme especificado no prompt do sistema.`;
   }
 
   isAIAvailable(): boolean {
-    return this.isConfigured && this.openai !== null;
+    return this.isConfigured;
   }
 }
-

@@ -56,4 +56,3 @@ export class CreateImobiliariaDto {
   @Length(8, 20)
   phone?: string;
 }
-

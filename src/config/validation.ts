@@ -25,4 +25,15 @@ export const validationSchema = Joi.object({
   FRONTEND_URL: Joi.string().default('http://localhost:3001'),
   OPENAI_API_KEY: Joi.string().allow('', null).optional(),
   OPENAI_MODEL: Joi.string().default('gpt-4o-mini'),
+  // SMTP Configuration
+  SMTP_HOST: Joi.string().allow('', null).optional(),
+  SMTP_PORT: Joi.number().default(587),
+  SMTP_SECURE: Joi.string().valid('true', 'false').default('false'),
+  SMTP_USER: Joi.string().allow('', null).optional(),
+  SMTP_PASSWORD: Joi.string().allow('', null).optional(),
+  SMTP_FROM_EMAIL: Joi.string()
+    .email()
+    .default('noreply@pagproseguro.com.br'),
+  SMTP_FROM_NAME: Joi.string().default('PagPro Seguro Fiança'),
+  NOTIFICATION_EMAIL_TO: Joi.string().allow('', null).optional(),
 });

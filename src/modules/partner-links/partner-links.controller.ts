@@ -31,10 +31,7 @@ export class PartnerLinksController {
     UserRole.INQUILINO,
   )
   @Post()
-  async create(
-    @CurrentUser() user: User,
-    @Body() dto: CreatePartnerLinkDto,
-  ) {
+  async create(@CurrentUser() user: User, @Body() dto: CreatePartnerLinkDto) {
     return this.partnerLinksService.createLink(user, dto);
   }
 
@@ -75,5 +72,3 @@ export class PartnerLinksController {
     return this.partnerLinksService.getPublicDetails(token);
   }
 }
-
-

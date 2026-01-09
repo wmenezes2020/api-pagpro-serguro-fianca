@@ -1,16 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { NotificationType } from '../../common/enums/notification-type.enum';
+import { EmailNotificationService } from './email-notification.service';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
+    private readonly emailNotificationService: EmailNotificationService,
   ) {}
 
   async create(
@@ -30,8 +34,34 @@ export class NotificationsService {
     title: string,
     message: string,
     metadata?: Record<string, unknown>,
+    sendEmail: boolean = true,
   ): Promise<Notification> {
-    return this.create(user.id, { type, title, message, metadata });
+    const notification = await this.create(user.id, {
+      type,
+      title,
+      message,
+      metadata,
+    });
+
+    // Enviar e-mail se solicitado e se o usuário tiver email
+    if (sendEmail && user.email) {
+      try {
+        await this.emailNotificationService.sendNotificationEmail(
+          user,
+          type,
+          title,
+          message,
+          metadata,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `⚠️ Falha ao enviar email de notificação para ${user.email}: ${error.message}`,
+        );
+        // Não falha a criação da notificação se o email falhar
+      }
+    }
+
+    return notification;
   }
 
   async findAllForUser(userId: string): Promise<Notification[]> {

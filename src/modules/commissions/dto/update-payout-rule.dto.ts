@@ -10,5 +10,3 @@ export class UpdatePayoutRuleDto {
   @Max(100)
   percentage: number;
 }
-
-

@@ -48,4 +48,3 @@ export class Commission {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-

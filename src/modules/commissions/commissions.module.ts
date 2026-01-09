@@ -23,4 +23,3 @@ import { User } from '../users/entities/user.entity';
   exports: [CommissionsService],
 })
 export class CommissionsModule {}
-

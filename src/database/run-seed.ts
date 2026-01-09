@@ -27,7 +27,9 @@ async function runSeed() {
         await userRepository.save(admin);
         console.log('Usuário administrador criado com sucesso.');
       } else {
-        console.log('Usuário administrador já existe. Nenhuma ação necessária.');
+        console.log(
+          'Usuário administrador já existe. Nenhuma ação necessária.',
+        );
       }
       return;
     } catch (error) {
@@ -36,7 +38,9 @@ async function runSeed() {
         error?.message ?? error,
       );
       if (attempt === attempts) {
-        console.error('Não foi possível conectar ao banco após múltiplas tentativas.');
+        console.error(
+          'Não foi possível conectar ao banco após múltiplas tentativas.',
+        );
         process.exit(1);
       }
       await new Promise((resolve) => setTimeout(resolve, delayMs));
